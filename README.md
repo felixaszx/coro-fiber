@@ -6,3 +6,6 @@ The idea, in its essense, is to co-operatively switch between different corounti
 
 ## Document
 See main.cxx for an example
+
+## Third-party
+Thanks to taskflow and his work steal queue https://github.com/taskflow/work-stealing-queue?tab=License-1-ov-file#readme

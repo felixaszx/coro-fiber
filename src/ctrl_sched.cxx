@@ -13,17 +13,7 @@ extern thread_local thr_ctx local;
 void //
 internal::schedule(coro_handle h, bool blocked_schedule) noexcept
 {
-    local.lock_.lock();
-    local.queue_.push_back(h);
-    local.lock_.unlock();
-}
-
-void //
-internal::schedule_next(coro_handle h) noexcept
-{
-    local.lock_.lock();
-    local.queue_.push_front(h);
-    local.lock_.unlock();
+    local.queue_.push(h);
 }
 
 bool //
@@ -56,48 +46,38 @@ coro_handle //
 this_thread::pick_next_fiber() noexcept
 {
     coro_handle next = {};
-    local.lock_.lock(); // Always lock the local_queue
-
+    usz seed = castr<uptr>(&local);
     // No reason to release the lock if the local queue is empty
     if (local.queue_.empty())
     {
         if (!local.allow_stealing_)
         {
-            local.lock_.unlock();
             return next;
         }
 
         usz curr_size = queue_size.load(std::memory_order_relaxed); // this can only go up
         for (u32 q = 0; q < curr_size && !next; q++)
         {
-            auto other_ctx = thr_ctxs[q];
+            auto other_ctx = thr_ctxs[(seed + q) % curr_size];
             if (other_ctx == &local)
             {
                 continue;
             }
 
-            // All empty queues are locked already
-            if (other_ctx->lock_.try_lock())
+            auto& other_queue = other_ctx->queue_;
+            if (!other_queue.steal(next))
             {
-                auto& other_queue = other_ctx->queue_;
-
-                // Steal from this queue
-                if (!other_queue.empty())
-                {
-                    next = other_queue.back();
-                    other_queue.pop_back();
-                }
-
-                other_ctx->lock_.unlock();
+                next = {};
             }
         }
     }
     else
     {
-        next = local.queue_.front();
-        local.queue_.pop_front();
+        if (!local.queue_.pop(next))
+        {
+            next = {};
+        }
     }
 
-    local.lock_.unlock();
     return next;
 }

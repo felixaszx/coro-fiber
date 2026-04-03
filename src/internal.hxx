@@ -5,6 +5,7 @@
 #include "fiber/fiber.hxx"
 #include "fiber/ctrl.hxx"
 #include "fiber/sync.hxx"
+#include "wsq.hxx"
 
 #include <deque>
 
@@ -36,13 +37,12 @@ namespace fiber
         std::reference_wrapper<const std::function<bool()>> wait_for_cond_;
     };
 
-    using fiber_queue = std::deque<coro_handle>;
+    using fiber_queue = work_stealing_queue<coro_handle>;
 
     struct thr_ctx
     {
         bool allow_stealing_ = true;
-        std::mutex lock_ = {};
-        fiber_queue queue_ = {};
+        fiber_queue queue_ = fiber_queue();
         coro_handle curr_fiber_ = {};
         ctrl ctrl_ = ctrl::noop;
         ctrl_data ctrl_data_ = {};
@@ -66,9 +66,6 @@ namespace fiber
     {
         static void //
         schedule(coro_handle h, bool reschedule = false) noexcept;
-
-        static void //
-        schedule_next(coro_handle h) noexcept;
 
         inline static bool //
         lock_run(coro_handle h, const std::function<void()>& func, bool blocked = false) noexcept

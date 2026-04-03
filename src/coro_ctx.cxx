@@ -58,16 +58,9 @@ coro_ctx::awaitable::await_suspend(coro_handle h) noexcept
     switch (local.ctrl_)
     {
         case ctrl::yield:
-        {
-            internal::schedule(h, true);
-            break;
-        }
         case ctrl::yield_to:
         {
-            local.lock_.lock();
-            local.queue_.push_back(h);
-            local.queue_.push_front(local.ctrl_data_.yield_to_);
-            local.lock_.unlock();
+            internal::schedule(h, true);
             break;
         }
         case ctrl::lock_mutex:
