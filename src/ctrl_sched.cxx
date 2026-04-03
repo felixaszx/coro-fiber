@@ -11,7 +11,7 @@ static std::mutex global_lock = {};
 extern thread_local thr_ctx local;
 
 void //
-this_thread::schedule(coro_handle h, bool blocked_schedule) noexcept
+internal::schedule(coro_handle h, bool blocked_schedule) noexcept
 {
     local.lock_.lock();
     local.queue_.push_back(h);
@@ -19,7 +19,7 @@ this_thread::schedule(coro_handle h, bool blocked_schedule) noexcept
 }
 
 void //
-this_thread::schedule_next(coro_handle h) noexcept
+internal::schedule_next(coro_handle h) noexcept
 {
     local.lock_.lock();
     local.queue_.push_front(h);

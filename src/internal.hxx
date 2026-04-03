@@ -16,6 +16,7 @@ namespace fiber
         yield,
         yield_to,
         wait_for_join,
+        wait_for_cond,
         lock_mutex,
         resume,
         start_stealing,
@@ -32,6 +33,7 @@ namespace fiber
         } lock_mutex_;
         coro_handle wait_for_join_;
         coro_handle yield_to_;
+        std::reference_wrapper<const std::function<bool()>> wait_for_cond_;
     };
 
     using fiber_queue = std::deque<coro_handle>;
@@ -62,6 +64,12 @@ namespace fiber
 
     struct internal
     {
+        static void //
+        schedule(coro_handle h, bool reschedule = false) noexcept;
+
+        static void //
+        schedule_next(coro_handle h) noexcept;
+
         inline static bool //
         lock_run(coro_handle h, const std::function<void()>& func, bool blocked = false) noexcept
         {

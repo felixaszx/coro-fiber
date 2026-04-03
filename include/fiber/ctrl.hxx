@@ -16,6 +16,9 @@ namespace fiber
         yield_to [[nodiscard]] (coro_handle h) noexcept;
 
         static coro_ctx //
+        wait_for [[nodiscard]] (const std::function<bool()>& cond) noexcept;
+
+        static coro_ctx //
         noop [[nodiscard]] () noexcept;
 
         static fiber::id //
@@ -27,17 +30,10 @@ namespace fiber
         friend fiber;
         friend coro_ctx;
 
-      protected:
-        static void //
-        schedule(coro_handle h, bool reschedule = false) noexcept;
-
-        static void //
-        schedule_next(coro_handle h) noexcept;
-
       public:
         this_thread() = delete;
 
-        static coro_handle
+        static coro_handle //
         pick_next_fiber() noexcept;
 
         static void //

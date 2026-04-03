@@ -16,6 +16,10 @@ coro_ctx::awaitable::await_ready [[nodiscard]] () noexcept
             bool run = internal::lock_run(jh, [&done, jh]() { done = jh.done(); });
             return run && done;
         }
+        case ctrl::wait_for_cond:
+        {
+            return local.ctrl_data_.wait_for_cond_();
+        }
         case ctrl::yield:
         case ctrl::yield_to:
         {
@@ -55,7 +59,7 @@ coro_ctx::awaitable::await_suspend(coro_handle h) noexcept
     {
         case ctrl::yield:
         {
-            this_thread::schedule(h, true);
+            internal::schedule(h, true);
             break;
         }
         case ctrl::yield_to:
@@ -68,8 +72,9 @@ coro_ctx::awaitable::await_suspend(coro_handle h) noexcept
         }
         case ctrl::lock_mutex:
         case ctrl::wait_for_join:
+        case ctrl::wait_for_cond:
         {
-            this_thread::schedule(h, true);
+            internal::schedule(h, true);
             break;
         }
         default:

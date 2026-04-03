@@ -14,7 +14,7 @@ void //
 fiber::fiber::launch(const std::function<coro()>& func) noexcept
 {
     h_ = func();
-    this_thread::schedule(h_, false);
+    internal::schedule(h_, false);
 }
 
 fiber::fiber::id //

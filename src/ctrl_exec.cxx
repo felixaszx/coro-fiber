@@ -17,7 +17,18 @@ wait_for_join(property::impl& prop, coro_handle joining_for)
         return true;
     }
 
-    // reschedule
+    return false;
+}
+
+inline static bool //
+wait_for_cond(property::impl& prop)
+{
+    if (prop.ctrl_data_.wait_for_cond_())
+    {
+        prop.ctrl_data_ = {};
+        return true;
+    }
+
     return false;
 }
 
@@ -33,7 +44,6 @@ lock_mutex(property::impl& prop)
         return true;
     }
 
-    // reschedule
     return false;
 }
 
@@ -46,7 +56,7 @@ this_thread::run_fiber(coro_handle h) noexcept
     // this fiber is reading by others, reschedule it
     if (!prop.lock_.try_lock())
     {
-        this_thread::schedule(h);
+        internal::schedule(h);
         return;
     }
 
@@ -57,7 +67,16 @@ this_thread::run_fiber(coro_handle h) noexcept
             exec = wait_for_join(prop, prop.ctrl_data_.wait_for_join_);
             if (!exec)
             {
-                this_thread::schedule(h, true);
+                internal::schedule(h, true);
+            }
+            break;
+        }
+        case ctrl::wait_for_cond:
+        {
+            exec = wait_for_cond(prop);
+            if (!exec)
+            {
+                internal::schedule(h, true);
             }
             break;
         }
@@ -66,7 +85,7 @@ this_thread::run_fiber(coro_handle h) noexcept
             exec = lock_mutex(prop);
             if (!exec)
             {
-                this_thread::schedule(h, true);
+                internal::schedule(h, true);
             }
             break;
         }

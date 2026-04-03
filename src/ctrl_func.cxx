@@ -20,6 +20,14 @@ this_fiber::yield_to [[nodiscard]] (coro_handle h) noexcept
 }
 
 coro_ctx //
+this_fiber::wait_for [[nodiscard]] (const std::function<bool()>& cond) noexcept
+{
+    local.ctrl_ = ctrl::wait_for_cond;
+    local.ctrl_data_.wait_for_cond_ = std::ref(cond);
+    return {};
+}
+
+coro_ctx //
 this_fiber::noop [[nodiscard]] () noexcept
 {
     local.ctrl_ = ctrl::noop;
