@@ -11,10 +11,10 @@ fiber::fiber::~fiber() noexcept
 }
 
 void //
-fiber::fiber::launch(const std::function<coro()>& func) noexcept
+fiber::fiber::launch(coro_handle h) noexcept
 {
-    h_ = func();
-    internal::schedule(h_, false);
+    internal::schedule(h, false);
+    h_ = h;
 }
 
 fiber::fiber::id //

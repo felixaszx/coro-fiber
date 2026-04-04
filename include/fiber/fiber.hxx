@@ -84,7 +84,6 @@ namespace fiber
         fiber& operator=(const fiber&) = delete;
 
         ~fiber() noexcept;
-        inline constexpr fiber(const std::function<coro()>& func) noexcept { launch(func); }
         inline constexpr operator coro_handle() const noexcept { return h_; }
         inline constexpr fiber(fiber&& other) { *this = std::move(other); }
         inline constexpr fiber& operator=(fiber&& other)
@@ -94,8 +93,20 @@ namespace fiber
             return *this;
         }
 
+        inline constexpr fiber(auto&& func, auto&&... args) noexcept
+            requires std::same_as<std::invoke_result_t<decltype(func), decltype(args)...>, coro>
+        {
+            launch(func(std::forward<decltype(args)>(args)...));
+        }
+
+        inline constexpr fiber(auto&& func) noexcept
+            requires std::same_as<std::invoke_result_t<decltype(func)>, coro>
+        {
+            launch(func());
+        }
+
         void //
-        launch(const std::function<coro()>& func) noexcept;
+        launch(coro_handle h) noexcept;
 
         id //
         get_id [[nodiscard]] () const noexcept;
