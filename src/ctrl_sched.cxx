@@ -73,7 +73,7 @@ this_thread::pick_next_fiber() noexcept
     }
     else
     {
-        if (!local.queue_.pop(next))
+        if (!local.queue_.steal(next))
         {
             next = {};
         }

@@ -23,7 +23,7 @@ coro_ctx::awaitable::await_ready [[nodiscard]] () noexcept
         case ctrl::yield:
         case ctrl::yield_to:
         {
-            return local.queue_.empty();
+            return false;
         }
         case ctrl::lock_mutex:
         {
@@ -59,10 +59,6 @@ coro_ctx::awaitable::await_suspend(coro_handle h) noexcept
     {
         case ctrl::yield:
         case ctrl::yield_to:
-        {
-            internal::schedule(h, true);
-            break;
-        }
         case ctrl::lock_mutex:
         case ctrl::wait_for_join:
         case ctrl::wait_for_cond:
