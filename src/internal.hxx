@@ -13,7 +13,10 @@ namespace fiber
 {
     enum class ctrl : u32
     {
+        // Creation ctrl
         new_fiber = 0,
+
+        // fiber ctrl
         yield,
         yield_to,
         wait_for_join,
@@ -23,6 +26,9 @@ namespace fiber
         resume,
         start_stealing,
         stop_stealing,
+
+        // thread ctrl
+        reschedule,
         noop = max_v,
     };
 

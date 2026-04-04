@@ -75,7 +75,7 @@ this_thread::run_fiber(coro_handle h) noexcept
             exec = wait_for_join(prop, prop.ctrl_data_.wait_for_join_);
             if (!exec)
             {
-                internal::schedule(h, true);
+                local.ctrl_ = ctrl::reschedule;
             }
             break;
         }
@@ -84,7 +84,7 @@ this_thread::run_fiber(coro_handle h) noexcept
             exec = wait_for_cond(prop);
             if (!exec)
             {
-                internal::schedule(h, true);
+                local.ctrl_ = ctrl::reschedule;
             }
             break;
         }
@@ -93,7 +93,7 @@ this_thread::run_fiber(coro_handle h) noexcept
             exec = lock_mutex(prop);
             if (!exec)
             {
-                internal::schedule(h, true);
+                local.ctrl_ = ctrl::reschedule;
             }
             break;
         }
@@ -102,12 +102,13 @@ this_thread::run_fiber(coro_handle h) noexcept
             exec = ::sleep_until(prop);
             if (!exec)
             {
-                internal::schedule(h, true);
+                local.ctrl_ = ctrl::reschedule;
             }
             break;
         }
         default:
         {
+            local.ctrl_ = ctrl::noop;
             exec = !h.done();
             break;
         }
@@ -122,9 +123,16 @@ this_thread::run_fiber(coro_handle h) noexcept
 
         if (h.done() && prop.detached_.load(std::memory_order_acquire))
         {
+            prop.lock_.unlock();
             h.destroy();
+            return;
         }
     }
 
     prop.lock_.unlock();
+    if (local.ctrl_ == ctrl::reschedule)
+    {
+        internal::schedule(h, true);
+        local.ctrl_ = ctrl::noop;
+    }
 }

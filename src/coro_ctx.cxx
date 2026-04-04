@@ -38,6 +38,7 @@ coro_ctx::awaitable::await_ready [[nodiscard]] () noexcept
         case ctrl::yield:
         case ctrl::yield_to:
         case ctrl::sleep_until:
+        case ctrl::reschedule:
         {
             return false;
         }
@@ -59,6 +60,7 @@ coro_ctx::awaitable::await_suspend(coro_handle h) noexcept
     auto& prop = prop_of(h);
     prop.ctrl_ = local.ctrl_;
     prop.ctrl_data_ = local.ctrl_data_;
+    local.ctrl_data_ = {};
 
     switch (local.ctrl_)
     {
@@ -69,15 +71,13 @@ coro_ctx::awaitable::await_suspend(coro_handle h) noexcept
         case ctrl::wait_for_cond:
         case ctrl::sleep_until:
         {
-            internal::schedule(h, true);
+            local.ctrl_ = ctrl::reschedule;
             break;
         }
         default:
         {
+            local.ctrl_ = ctrl::noop;
             break;
         }
     }
-
-    local.ctrl_ = ctrl::noop;
-    local.ctrl_data_ = {};
 }
