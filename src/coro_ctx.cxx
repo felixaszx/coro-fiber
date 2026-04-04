@@ -23,7 +23,7 @@ coro_ctx::awaitable::await_ready [[nodiscard]] () noexcept
         case ctrl::yield:
         case ctrl::yield_to:
         {
-            return false;
+            return local.queue_.empty();
         }
         case ctrl::lock_mutex:
         {
