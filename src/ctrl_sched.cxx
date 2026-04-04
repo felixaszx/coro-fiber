@@ -34,7 +34,7 @@ this_thread::init_scheduler(bool allow_stealing) noexcept
     if (queue_size.load(std::memory_order_relaxed) < std::thread::hardware_concurrency())
     {
         thr_ctxs[curr_size] = &local;
-        queue_size.fetch_add(1, std::memory_order_relaxed);
+        queue_size.fetch_add(1, std::memory_order_release);
         success = true;
     }
 
@@ -55,7 +55,7 @@ this_thread::pick_next_fiber() noexcept
             return next;
         }
 
-        usz curr_size = queue_size.load(std::memory_order_relaxed); // this can only go up
+        usz curr_size = queue_size.load(std::memory_order_acquire); // this can only go up
         for (u32 q = 0; q < curr_size && !next; q++)
         {
             auto other_ctx = thr_ctxs[(seed + q) % curr_size];

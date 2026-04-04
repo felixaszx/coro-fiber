@@ -6,9 +6,12 @@ using namespace fiber;
 extern thread_local thr_ctx local;
 
 inline static bool //
-wait_for_join(property::impl& prop)
+wait_for_join(property::impl& prop, coro_handle joining_for)
 {
-    if (prop.ctrl_data_.wait_for_join_.done())
+    bool done = false;
+    bool run = internal::lock_run(joining_for, [&done, joining_for]() { done = joining_for.done(); });
+
+    if (run && done)
     {
         return true;
     }
@@ -58,11 +61,18 @@ this_thread::run_fiber(coro_handle h) noexcept
     bool exec = false;
     auto& prop = prop_of(h);
 
+    // this fiber is reading by others, reschedule it
+    if (!prop.lock_.try_lock())
+    {
+        internal::schedule(h);
+        return;
+    }
+
     switch (prop.ctrl_)
     {
         case ctrl::wait_for_join:
         {
-            exec = wait_for_join(prop);
+            exec = wait_for_join(prop, prop.ctrl_data_.wait_for_join_);
             if (!exec)
             {
                 internal::schedule(h, true);
@@ -115,4 +125,6 @@ this_thread::run_fiber(coro_handle h) noexcept
             h.destroy();
         }
     }
+
+    prop.lock_.unlock();
 }

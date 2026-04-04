@@ -11,7 +11,10 @@ coro_ctx::awaitable::await_ready [[nodiscard]] () noexcept
     {
         case ctrl::wait_for_join:
         {
-            return local.ctrl_data_.wait_for_join_.done();
+            auto jh = local.ctrl_data_.wait_for_join_;
+            bool done = false;
+            bool run = internal::lock_run(jh, [&done, jh]() { done = jh.done(); });
+            return run && done;
         }
         case ctrl::wait_for_cond:
         {
@@ -56,7 +59,13 @@ coro_ctx::awaitable::await_suspend(coro_handle h) noexcept
     panic_if(h != local.curr_fiber_, //
              "coro_ctx::await_suspend() does not executed on the same thread with the calling fiber");
 
-    switch (local.ctrl_)
+    auto& prop = prop_of(h);
+    prop.ctrl_ = local.ctrl_;
+    prop.ctrl_data_ = local.ctrl_data_;
+    local.ctrl_ = ctrl::noop;
+    local.ctrl_data_ = {};
+
+    switch (prop.ctrl_)
     {
         case ctrl::yield:
         case ctrl::yield_to:
@@ -74,9 +83,4 @@ coro_ctx::awaitable::await_suspend(coro_handle h) noexcept
         }
     }
 
-    auto& prop = prop_of(h);
-    prop.ctrl_ = local.ctrl_;
-    prop.ctrl_data_ = local.ctrl_data_;
-    local.ctrl_ = ctrl::noop;
-    local.ctrl_data_ = {};
 }
