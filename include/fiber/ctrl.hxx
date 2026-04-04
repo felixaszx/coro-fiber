@@ -27,7 +27,7 @@ namespace fiber
         static coro_ctx //
         sleep_until [[nodiscard]] (const std::chrono::time_point<std::chrono::high_resolution_clock>& tp) noexcept;
 
-        inline static constexpr coro_ctx //
+        inline static coro_ctx //
         sleep_for [[nodiscard]] (const std::chrono::nanoseconds& duration) noexcept
         {
             return sleep_until(std::chrono::high_resolution_clock::now() + duration);
