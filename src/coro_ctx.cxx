@@ -20,24 +20,9 @@ coro_ctx::awaitable::await_ready [[nodiscard]] () noexcept
         {
             return local.ctrl_data_.wait_for_cond_();
         }
-        case ctrl::yield:
-        case ctrl::yield_to:
-        {
-            return false;
-        }
         case ctrl::lock_mutex:
         {
             return local.ctrl_data_.lock_mutex_.success_;
-        }
-        case ctrl::sleep_until:
-        {
-            return false;
-        }
-        case ctrl::noop:
-        case ctrl::resume:
-        case ctrl::new_fiber:
-        {
-            return true;
         }
         case ctrl::start_stealing:
         {
@@ -48,6 +33,18 @@ coro_ctx::awaitable::await_ready [[nodiscard]] () noexcept
         case ctrl::stop_stealing:
         {
             local.allow_stealing_ = false;
+            return true;
+        }
+        case ctrl::yield:
+        case ctrl::yield_to:
+        case ctrl::sleep_until:
+        {
+            return false;
+        }
+        case ctrl::noop:
+        case ctrl::resume:
+        case ctrl::new_fiber:
+        {
             return true;
         }
     }
@@ -62,10 +59,8 @@ coro_ctx::awaitable::await_suspend(coro_handle h) noexcept
     auto& prop = prop_of(h);
     prop.ctrl_ = local.ctrl_;
     prop.ctrl_data_ = local.ctrl_data_;
-    local.ctrl_ = ctrl::noop;
-    local.ctrl_data_ = {};
 
-    switch (prop.ctrl_)
+    switch (local.ctrl_)
     {
         case ctrl::yield:
         case ctrl::yield_to:
@@ -83,4 +78,6 @@ coro_ctx::awaitable::await_suspend(coro_handle h) noexcept
         }
     }
 
+    local.ctrl_ = ctrl::noop;
+    local.ctrl_data_ = {};
 }
