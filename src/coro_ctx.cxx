@@ -29,6 +29,10 @@ coro_ctx::awaitable::await_ready [[nodiscard]] () noexcept
         {
             return local.ctrl_data_.lock_mutex_.success_;
         }
+        case ctrl::sleep_until:
+        {
+            return false;
+        }
         case ctrl::noop:
         case ctrl::resume:
         case ctrl::new_fiber:
@@ -62,6 +66,7 @@ coro_ctx::awaitable::await_suspend(coro_handle h) noexcept
         case ctrl::lock_mutex:
         case ctrl::wait_for_join:
         case ctrl::wait_for_cond:
+        case ctrl::sleep_until:
         {
             internal::schedule(h, true);
             break;

@@ -13,7 +13,6 @@ wait_for_join(property::impl& prop, coro_handle joining_for)
 
     if (run && done)
     {
-        prop.ctrl_data_ = {};
         return true;
     }
 
@@ -25,7 +24,6 @@ wait_for_cond(property::impl& prop)
 {
     if (prop.ctrl_data_.wait_for_cond_())
     {
-        prop.ctrl_data_ = {};
         return true;
     }
 
@@ -40,7 +38,17 @@ lock_mutex(property::impl& prop)
 
     if (mtx.mtx_->try_lock())
     {
-        prop.ctrl_data_ = {};
+        return true;
+    }
+
+    return false;
+}
+
+inline static bool //
+sleep_until(property::impl& prop)
+{
+    if (prop.ctrl_data_.sleep_until_ <= std::chrono::high_resolution_clock::now())
+    {
         return true;
     }
 
@@ -83,6 +91,15 @@ this_thread::run_fiber(coro_handle h) noexcept
         case ctrl::lock_mutex:
         {
             exec = lock_mutex(prop);
+            if (!exec)
+            {
+                internal::schedule(h, true);
+            }
+            break;
+        }
+        case ctrl::sleep_until:
+        {
+            exec = ::sleep_until(prop);
             if (!exec)
             {
                 internal::schedule(h, true);

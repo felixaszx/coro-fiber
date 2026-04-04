@@ -18,12 +18,15 @@ namespace fiber
         yield_to,
         wait_for_join,
         wait_for_cond,
+        sleep_until,
         lock_mutex,
         resume,
         start_stealing,
         stop_stealing,
         noop = max_v,
     };
+
+    using fiber_queue = work_stealing_queue<coro_handle>;
 
     union ctrl_data
     {
@@ -34,10 +37,9 @@ namespace fiber
         } lock_mutex_;
         coro_handle wait_for_join_;
         coro_handle yield_to_;
+        std::chrono::time_point<std::chrono::high_resolution_clock> sleep_until_;
         std::reference_wrapper<const std::function<bool()>> wait_for_cond_;
     };
-
-    using fiber_queue = work_stealing_queue<coro_handle>;
 
     struct thr_ctx
     {

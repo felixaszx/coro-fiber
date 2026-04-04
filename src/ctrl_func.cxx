@@ -53,3 +53,11 @@ this_thread::stop_stealing [[nodiscard]] () noexcept
     local.ctrl_ = ctrl::stop_stealing;
     return {};
 }
+
+coro_ctx //
+this_fiber::sleep_until [[nodiscard]] (const std::chrono::time_point<std::chrono::high_resolution_clock>& tp) noexcept
+{
+    local.ctrl_ = ctrl::sleep_until;
+    local.ctrl_data_.sleep_until_ = tp;
+    return {};
+}
