@@ -11,10 +11,7 @@ coro_ctx::awaitable::await_ready [[nodiscard]] () noexcept
     {
         case ctrl::wait_for_join:
         {
-            auto jh = local.ctrl_data_.wait_for_join_;
-            bool done = false;
-            bool run = internal::lock_run(jh, [&done, jh]() { done = jh.done(); });
-            return run && done;
+            return local.ctrl_data_.wait_for_join_.done();
         }
         case ctrl::wait_for_cond:
         {

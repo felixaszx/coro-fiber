@@ -54,7 +54,6 @@ namespace fiber
 
     struct property::impl
     {
-        spinlock lock_ = {};
         ctrl ctrl_ = ctrl::new_fiber;
         ctrl_data ctrl_data_ = {};
 
@@ -68,34 +67,6 @@ namespace fiber
     {
         static void //
         schedule(coro_handle h, bool reschedule = false) noexcept;
-
-        inline static bool //
-        lock_run(coro_handle h, const std::function<void()>& func, bool blocked = false) noexcept
-        {
-            return lock_run(prop_of(h), func, blocked);
-        }
-
-        inline static bool //
-        lock_run(property::impl& prop, const std::function<void()>& func, bool blocked = false) noexcept
-        {
-            auto& lk = prop.lock_;
-            if (blocked)
-            {
-                lk.lock();
-            }
-            else
-            {
-                if (!lk.try_lock())
-                {
-                    return false;
-                }
-            }
-
-            func();
-
-            lk.unlock();
-            return true;
-        }
     };
 }; // namespace fiber
 
