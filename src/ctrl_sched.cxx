@@ -4,10 +4,6 @@
 
 using namespace fiber;
 
-ctx_ref thr_ctxs = {};
-atomic_usz queue_size = 0;
-static std::mutex global_lock = {};
-
 extern thread_local thr_ctx local;
 
 void //
@@ -16,29 +12,31 @@ internal::schedule(coro_handle h, bool blocked_schedule) noexcept
     local.queue_.push(h);
 }
 
+ctx_pool::ctx_pool(std::size_t ctx_limit) noexcept
+    : impl_(std::make_unique<impl>(ctx_limit))
+{
+}
+
+ctx_pool::~ctx_pool() noexcept = default;
+
 bool //
-this_thread::init_scheduler(bool allow_stealing) noexcept
+this_thread::init_scheduler(ctx_pool& pool, bool allow_stealing) noexcept
 {
     bool success = false;
-    global_lock.lock();
-
     local.allow_stealing_ = allow_stealing;
 
-    // To prevent any memory allocation
-    if (!thr_ctxs)
-    {
-        thr_ctxs = std::make_unique<thr_ctx*[]>(std::thread::hardware_concurrency());
-    }
+    std::unique_lock lk(pool.impl_->mtx_);
+    auto& global = pool.impl_;
 
-    usz curr_size = queue_size;
-    if (queue_size.load(std::memory_order_relaxed) < std::thread::hardware_concurrency())
+    usz curr_size = global->size_.load(std::memory_order_relaxed);
+    if (curr_size < global->limit_)
     {
-        thr_ctxs[curr_size] = &local;
-        queue_size.fetch_add(1, std::memory_order_release);
+        global->thr_ctxs_[curr_size] = &local;
+        global->size_.fetch_add(1, std::memory_order_release);
+        local.pool_ = &pool;
         success = true;
     }
 
-    global_lock.unlock();
     return success;
 }
 
@@ -55,10 +53,11 @@ this_thread::pick_next_fiber() noexcept
             return next;
         }
 
-        usz curr_size = queue_size.load(std::memory_order_acquire); // this can only go up
+        auto& global = *local.pool_->impl_;
+        usz curr_size = global.size_.load(std::memory_order_acquire); // this can only go up
         for (u32 q = 0; q < curr_size && !next; q++)
         {
-            auto other_ctx = thr_ctxs[(seed + q) % curr_size];
+            auto other_ctx = global.thr_ctxs_[(seed + q) % curr_size];
             if (other_ctx == &local)
             {
                 continue;

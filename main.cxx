@@ -1,18 +1,27 @@
-#include <coroutine>
 #include <iostream>
 #include <thread>
 #include <latch>
 
 #include "fiber/fiber.hxx"
 #include "fiber/ctrl.hxx"
-#include "fiber/sync.hxx"
 
 inline const std::size_t sample_size = 1'000'000;
 
 using namespace std::chrono_literals;
 
-fiber::coro //
-test_func()
+__attribute__((noinline)) //
+fiber::coro               //
+test_func2()
+{
+    while (true)
+    {
+        co_await fiber::this_fiber::yield();
+    }
+}
+
+__attribute__((noinline)) //
+fiber::coro               //
+test_func(bool a)
 {
     auto diff = 0ns;
     auto prev = std::chrono::high_resolution_clock::now();
@@ -27,12 +36,15 @@ test_func()
         if (counter == sample_size)
         {
             auto avg = diff / counter;
-            std::cout << std::format("Context switching time: {}ns\n", avg.count());
+            std::cout << std::format("Context switching time: {}ns, thr: {}\r", avg.count(),
+                                     std::this_thread::get_id());
             counter = 0;
             diff = 0ns;
         }
     }
 }
+
+fiber::ctx_pool pool(std::thread::hardware_concurrency());
 
 int //
 main(int argc, const char** argv)
@@ -45,7 +57,7 @@ main(int argc, const char** argv)
         test_thrs.emplace_back(
             [&]()
             {
-                fiber::this_thread::init_scheduler();
+                fiber::this_thread::init_scheduler(pool);
                 std::uint8_t cycle = 0;
                 while (true)
                 {
@@ -68,9 +80,9 @@ main(int argc, const char** argv)
             });
     }
 
-    fiber::this_thread::init_scheduler();
+    fiber::this_thread::init_scheduler(pool);
 
-    fiber::fiber a(test_func);
+    fiber::fiber a(test_func, false);
 
     std::uint8_t cycle = 0;
     while (true)

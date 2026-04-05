@@ -47,16 +47,22 @@ namespace fiber
         std::reference_wrapper<const std::function<bool()>> wait_for_cond_;
     };
 
-    struct thr_ctx
-    {
-        bool allow_stealing_ = true;
-        fiber_queue queue_ = fiber_queue();
-        coro_handle curr_fiber_ = {};
-        ctrl ctrl_ = ctrl::noop;
-        ctrl_data ctrl_data_ = {};
-    };
-
+    struct thr_ctx;
     using ctx_ref = unique<thr_ctx*[]>;
+
+    struct ctx_pool::impl
+    {
+        ctx_ref thr_ctxs_ = {};
+        const usz limit_ = {};
+        atomic_usz size_ = 0;
+        std::mutex mtx_ = {};
+
+        inline constexpr impl(usz limit) noexcept
+            : thr_ctxs_(std::make_unique<thr_ctx*[]>(limit)),
+              limit_(limit)
+        {
+        }
+    };
 
     struct property::impl
     {
@@ -66,6 +72,16 @@ namespace fiber
 
         // No lock is required for fields below
         atomic_bool detached_ = false;
+    };
+
+    struct thr_ctx
+    {
+        bool allow_stealing_ = true;
+        ctrl ctrl_ = ctrl::noop;
+        coro_handle curr_fiber_ = {};
+        ctx_pool* pool_ = nullptr;
+        ctrl_data ctrl_data_ = {};
+        fiber_queue queue_ = fiber_queue();
     };
 
 #define prop_of(fiber_handle) (*fiber_handle.promise().impl_)

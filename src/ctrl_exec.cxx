@@ -1,5 +1,4 @@
 #include "internal.hxx"
-#include <mutex>
 
 using namespace fiber;
 

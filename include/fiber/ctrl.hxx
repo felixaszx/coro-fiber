@@ -5,6 +5,19 @@
 
 namespace fiber
 {
+    struct ctx_pool
+    {
+        friend this_thread;
+
+      protected:
+        struct impl;
+        std::unique_ptr<impl> impl_ = {};
+
+      public:
+        ctx_pool(std::size_t ctx_limit) noexcept;
+        ~ctx_pool() noexcept;
+    };
+
     struct this_fiber
     {
         this_fiber() = delete;
@@ -49,7 +62,7 @@ namespace fiber
         run_fiber(coro_handle h) noexcept;
 
         static bool //
-        init_scheduler(bool allow_stealing = true) noexcept;
+        init_scheduler(ctx_pool& pool, bool allow_stealing = true) noexcept;
 
         static coro_ctx //
         start_stealing [[nodiscard]] () noexcept;
