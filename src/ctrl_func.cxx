@@ -61,3 +61,15 @@ this_fiber::sleep_until [[nodiscard]] (const std::chrono::time_point<std::chrono
     local.ctrl_data_.sleep_until_ = tp;
     return {};
 }
+
+bool //
+this_thread::steal_from(const ctx_pool& pool)
+{
+    coro_handle h = internal::steal_from(pool, local);
+    if (h)
+    {
+        internal::schedule(h, false);
+        return true;
+    }
+    return false;
+}

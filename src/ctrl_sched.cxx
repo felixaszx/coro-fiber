@@ -44,7 +44,7 @@ coro_handle //
 this_thread::pick_next_fiber() noexcept
 {
     coro_handle next = {};
-    usz seed = castr<uptr>(&local);
+
     // No reason to release the lock if the local queue is empty
     if (local.queue_.empty())
     {
@@ -53,22 +53,7 @@ this_thread::pick_next_fiber() noexcept
             return next;
         }
 
-        auto& global = *local.pool_->impl_;
-        usz curr_size = global.size_.load(std::memory_order_acquire); // this can only go up
-        for (u32 q = 0; q < curr_size && !next; q++)
-        {
-            auto other_ctx = global.thr_ctxs_[(seed + q) % curr_size];
-            if (other_ctx == &local)
-            {
-                continue;
-            }
-
-            auto& other_queue = other_ctx->queue_;
-            if (!other_queue.steal(next))
-            {
-                next = {};
-            }
-        }
+        next = internal::steal_from(*local.pool_, local);
     }
     else
     {

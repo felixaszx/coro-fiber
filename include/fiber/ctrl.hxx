@@ -8,6 +8,7 @@ namespace fiber
     struct ctx_pool
     {
         friend this_thread;
+        friend internal;
 
       protected:
         struct impl;
@@ -69,6 +70,9 @@ namespace fiber
 
         static coro_ctx //
         stop_stealing [[nodiscard]] () noexcept;
+
+        static bool //
+        steal_from(const ctx_pool& pool);
     };
 }; // namespace fiber
 

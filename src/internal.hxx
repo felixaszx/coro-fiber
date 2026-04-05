@@ -118,6 +118,32 @@ namespace fiber
             lk.unlock();
             return true;
         }
+
+        inline static coro_handle //
+        steal_from(const ctx_pool& pool, thr_ctx& local)
+        {
+            coro_handle h = {};
+            usz seed = castr<uptr>(&local);
+            auto& other = *pool.impl_;
+
+            usz curr_size = other.size_.load(std::memory_order_acquire); // this can only go up
+            for (u32 q = 0; q < curr_size && !h; q++)
+            {
+                auto other_ctx = other.thr_ctxs_[(seed + q) % curr_size];
+                if (other_ctx == &local)
+                {
+                    continue;
+                }
+
+                auto& other_queue = other_ctx->queue_;
+                if (!other_queue.steal(h))
+                {
+                    h = {};
+                }
+            }
+
+            return h;
+        }
     };
 }; // namespace fiber
 
