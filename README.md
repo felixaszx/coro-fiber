@@ -9,3 +9,11 @@ See main.cxx for an example
 
 ## Third-party
 Thanks to taskflow and his work steal queue https://github.com/taskflow/work-stealing-queue?tab=License-1-ov-file#readme
+
+## Some issues
+On larget lambda captures, the performance can drop significantly. Apparently the idea of fiber + scheduler only works well on computational intense environment.
+
+My original goal is to create a base framework for my game engine, but I now realise that sometimes a much simpler design will be good (LOL).
+
+## Next steps
+More simplify the async framework.
