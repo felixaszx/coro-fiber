@@ -16,4 +16,4 @@ On larget lambda captures, the performance can drop significantly. Apparently th
 My original goal is to create a base framework for my game engine, but I now realise that sometimes a much simpler design will be good (LOL).
 
 ## Next steps
-More simplify the async framework.
+More simplify the async framework. Try to *avoid* coroutine.
