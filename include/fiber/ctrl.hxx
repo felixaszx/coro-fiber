@@ -1,79 +1,191 @@
 #ifndef FIBER_CTRL_HXX
 #define FIBER_CTRL_HXX
 
-#include "fiber.hxx"
+#include "coro.hxx"
 
-namespace fiber
+namespace fiber::ctrl
 {
-    struct ctx_pool
+    template <>
+    struct reschedule<void>
     {
-        friend this_thread;
-        friend internal;
+        friend coro_state;
 
       protected:
-        struct impl;
-        std::unique_ptr<impl> impl_ = {};
-
-      public:
-        ctx_pool(std::size_t ctx_limit) noexcept;
-        ~ctx_pool() noexcept;
+        inline static const ctrl_code ctrl_ = ctrl_code::reschedule;
+        inline static const bool has_ctrl_state_ = false;
+        inline static const bool has_ctrl_call_ = false;
     };
 
-    struct this_fiber
+    template <>
+    struct reschedule<thr_ctx>
     {
-        this_fiber() = delete;
+        friend coro_state;
 
-        static coro_ctx //
-        yield [[nodiscard]] () noexcept;
+      protected:
+        inline static const ctrl_code ctrl_ = ctrl_code::reschedule_n_get_ctx;
+        inline static const bool has_ctrl_state_ = true;
+        inline static const bool has_ctrl_call_ = false;
 
-        static coro_ctx //
-        yield_to [[nodiscard]] (coro_handle h) noexcept;
+        ctrl_state ctrl_state_ = {};
 
-        static coro_ctx //
-        wait_for [[nodiscard]] (const std::function<bool()>& cond) noexcept;
+      public:
+        inline constexpr reschedule(const thr_ctx*& ref_ctx) { ctrl_state_.reschedule_n_get_ctx_ = &ref_ctx; }
+    };
 
-        static coro_ctx //
-        noop [[nodiscard]] () noexcept;
+    template <>
+    struct reschedule<low_priority>
+    {
+        friend coro_state;
 
-        static fiber::id //
-        get_id [[nodiscard]] () noexcept;
+      protected:
+        inline static const ctrl_code ctrl_ = ctrl_code::reschedule_to_low_priority;
+        inline static const bool has_ctrl_state_ = false;
+        inline static const bool has_ctrl_call_ = false;
+    };
 
-        static coro_ctx //
-        sleep_until [[nodiscard]] (const std::chrono::time_point<std::chrono::high_resolution_clock>& tp) noexcept;
+    struct wait_for
+    {
+        friend coro_state;
 
-        inline static coro_ctx //
-        sleep_for [[nodiscard]] (const std::chrono::nanoseconds& duration) noexcept
+      protected:
+        inline static const ctrl_code ctrl_ = ctrl_code::wait_for_cond;
+        inline static const bool has_ctrl_state_ = true;
+        inline static const bool has_ctrl_call_ = false;
+
+        ctrl_state ctrl_state_ = {};
+
+      public:
+        inline constexpr wait_for(const std::function<bool()>& call)
         {
-            return sleep_until(std::chrono::high_resolution_clock::now() + duration);
+            ctrl_state_.wait_for_cond_.func_ = std::ref(call);
         }
     };
 
-    struct this_thread
+    struct join_fiber
     {
-        friend fiber;
-        friend coro_ctx;
+        friend coro_state;
+
+      protected:
+        inline static const ctrl_code ctrl_ = ctrl_code::wait_for_join;
+        inline static const bool has_ctrl_state_ = true;
+        inline static const bool has_ctrl_call_ = false;
+
+        ctrl_state ctrl_state_ = {};
 
       public:
-        this_thread() = delete;
-
-        static coro_handle //
-        pick_next_fiber() noexcept;
-
-        static void //
-        run_fiber(coro_handle h) noexcept;
-
-        static bool //
-        init_scheduler(ctx_pool& pool, bool allow_stealing = true) noexcept;
-
-        static coro_ctx //
-        start_stealing [[nodiscard]] () noexcept;
-
-        static coro_ctx //
-        stop_stealing [[nodiscard]] () noexcept;
-
-        static bool //
-        steal_from(const ctx_pool& pool);
+        inline constexpr join_fiber(coro_handle jh) { ctrl_state_.wait_for_join_ = jh; }
     };
-}; // namespace fiber
 
+    struct sleep_until
+    {
+        friend coro_state;
+
+      protected:
+        inline static const ctrl_code ctrl_ = ctrl_code::sleep_until;
+        inline static const bool has_ctrl_state_ = true;
+        inline static const bool has_ctrl_call_ = false;
+
+        ctrl_state ctrl_state_ = {};
+
+      public:
+        inline constexpr sleep_until(std::chrono::time_point<std::chrono::high_resolution_clock> tp)
+        {
+            ctrl_state_.sleep_until_ = tp;
+        }
+    };
+
+    struct sleep_for
+    {
+        friend coro_state;
+
+      protected:
+        inline static const ctrl_code ctrl_ = ctrl_code::sleep_until;
+        inline static const bool has_ctrl_state_ = true;
+        inline static const bool has_ctrl_call_ = false;
+
+        ctrl_state ctrl_state_ = {};
+
+      public:
+        inline constexpr sleep_for(auto&& duration)
+        {
+            ctrl_state_.sleep_until_ = std::chrono::high_resolution_clock::now() //
+                                       + std::forward<decltype(duration)>(duration);
+        }
+    };
+
+    struct switch_to_background
+    {
+        friend coro_state;
+
+      protected:
+        inline static const ctrl_code ctrl_ = ctrl_code::switch_to_background;
+        inline static const bool has_ctrl_state_ = false;
+        inline static const bool has_ctrl_call_ = false;
+    };
+
+    struct bring_to_foreground
+    {
+        friend coro_state;
+
+      protected:
+        inline static const ctrl_code ctrl_ = ctrl_code::bring_to_foreground;
+        inline static const bool has_ctrl_state_ = false;
+        inline static const bool has_ctrl_call_ = false;
+    };
+
+    // non-context switching controls and queries, co_await these
+    template <>
+    struct query<coro_state>
+    {
+      protected:
+        coro_state::state_ref s_;
+
+      public:
+        inline static consteval bool await_ready [[nodiscard]] () noexcept { return false; }
+        inline constexpr coro_state::state_ref await_resume [[nodiscard]] () noexcept { return s_; }
+
+        inline bool //
+        await_suspend(coro_handle h) noexcept
+        {
+            s_.ref_ = &h.promise();
+            return false;
+        }
+    };
+
+    template <>
+    struct set<switch_to_background>
+    {
+      protected:
+        const thr_ctx* t_ = nullptr;
+
+      public:
+        inline static consteval bool await_ready [[nodiscard]] () noexcept { return false; }
+        inline static consteval void await_resume() noexcept {}
+
+        inline bool //
+        await_suspend(coro_handle h) noexcept
+        {
+            h.promise().yield_value(switch_to_background());
+            return false;
+        }
+    };
+
+    template <>
+    struct set<bring_to_foreground>
+    {
+      protected:
+        const thr_ctx* t_ = nullptr;
+
+      public:
+        inline static consteval bool await_ready [[nodiscard]] () noexcept { return false; }
+        inline static consteval void await_resume() noexcept {}
+
+        inline bool //
+        await_suspend(coro_handle h) noexcept
+        {
+            h.promise().yield_value(bring_to_foreground());
+            return false;
+        }
+    };
+}; // namespace fiber::ctrl
 #endif // FIBER_CTRL_HXX

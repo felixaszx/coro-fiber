@@ -1,125 +1,142 @@
 #ifndef FIBER_FIBER_HXX
 #define FIBER_FIBER_HXX
 
-#include <atomic>
-#include <memory>
-#include <coroutine>
-#include <type_traits>
-#include <functional>
-#include <cstdint>
-
-#include "fwd.hxx"
+#include "coro.hxx"
+#include "thr_ctx.hxx"
+#include "ctrl.hxx"
 
 namespace fiber
 {
-    struct property
+    template <typename C, typename... Args>
+    concept fiber_coroutine = std::same_as<std::invoke_result_t<C, void>, coro> || //
+                              std::same_as<std::invoke_result_t<C, Args...>, coro>;
+
+    template <typename T>
+    concept deferencible_to_thr_ctx = requires(T p) //
     {
-        friend fiber;
-        friend coro_ctx;
-        friend this_fiber;
-        friend this_thread;
-        friend internal;
-
-      public:
-        struct impl;
-
-      protected:
-        std::unique_ptr<impl> impl_ = {};
-
-      public:
-        property() noexcept;
-        ~property() noexcept;
-        inline static constexpr auto initial_suspend() noexcept { return std::suspend_always(); }
-        inline static constexpr auto final_suspend() noexcept { return std::suspend_always(); }
-        inline static constexpr void return_void() noexcept {}
-        inline static constexpr void unhandled_exception() noexcept {}
-        inline static constexpr auto&& yield_value(coro_ctx&& ctx) noexcept { return ctx; }
-        inline constexpr coro get_return_object() noexcept { return {coro::from_promise(*this)}; }
+        { *p } -> std::convertible_to<const thr_ctx&>;
     };
 
-    struct coro_ctx
+    template <typename T>
+    concept thr_ctx_handle = std::convertible_to<T, const thr_ctx&> || //
+                             deferencible_to_thr_ctx<T>;
+
+    struct launch
     {
-        friend fiber;
-        friend this_fiber;
-        friend this_thread;
-        friend mutex;
+        launch() = delete;
 
-      protected:
-        inline constexpr coro_ctx() = default;
-
-        struct awaitable
+        enum flags : std::int8_t
         {
-            static bool //
-            await_ready [[nodiscard]] () noexcept;
-
-            static void //
-            await_suspend(coro_handle h) noexcept;
-
-            inline static constexpr void //
-            await_resume() noexcept
-            {
-            }
+            foreground_attached = 0,
+            background = 1 << 1,
+            detached = 1 << 2,
         };
-
-      public:
-        inline constexpr awaitable operator co_await [[nodiscard]] () const noexcept { return {}; }
     };
 
     struct fiber
     {
-        friend internal;
-        friend coro_ctx;
-        friend this_thread;
-
       protected:
         coro_handle h_ = {};
 
+        inline void //
+        launc_now(const thr_ctx& ctx, coro_handle h, bool background, bool detached) noexcept
+        {
+            h.promise().backgroud_ = background;
+            h.promise().detached_ = detached;
+            ctx.schedule(h);
+
+            if (!detached)
+            {
+                h_ = h;
+            }
+        }
+
       public:
         using id = uintptr_t;
-        inline static const id invalid_id = reinterpret_cast<id>(nullptr);
-
-        fiber() = default;
 
         fiber(const fiber&) = delete;
         fiber& operator=(const fiber&) = delete;
 
-        ~fiber() noexcept;
         inline constexpr operator coro_handle() const noexcept { return h_; }
         inline constexpr fiber(fiber&& other) { *this = std::move(other); }
-        inline constexpr fiber& operator=(fiber&& other)
+        inline constexpr fiber& operator=(fiber&& other);
+        inline constexpr fiber() noexcept = default;
+        inline constexpr ~fiber() noexcept;
+
+        inline constexpr fiber(std::underlying_type_t<launch::flags> l,
+                               thr_ctx_handle auto&& ctx,
+                               auto&& func,
+                               auto&&... args) noexcept
+            requires fiber_coroutine<decltype(func), decltype(args)...>
         {
-            h_ = other.h_;
-            other.h_ = {};
-            return *this;
+            bool background_fiber = l & launch::background;
+            bool detached_fiber = l & launch::detached;
+
+            if constexpr (deferencible_to_thr_ctx<decltype(ctx)>)
+            {
+                launc_now(*ctx, func(std::forward<decltype(args)>(args)...), background_fiber, detached_fiber);
+            }
+            else
+            {
+                launc_now(ctx, func(std::forward<decltype(args)>(args)...), background_fiber, detached_fiber);
+            }
         }
 
-        inline constexpr fiber(auto&& func, auto&&... args) noexcept
-            requires std::same_as<std::invoke_result_t<decltype(func), decltype(args)...>, coro>
-        {
-            launch(func(std::forward<decltype(args)>(args)...));
-        }
-
-        inline constexpr fiber(auto&& func) noexcept
-            requires std::same_as<std::invoke_result_t<decltype(func)>, coro>
-        {
-            launch(func());
-        }
-
-        void //
-        launch(coro_handle h) noexcept;
-
-        id //
+        inline id //
         get_id [[nodiscard]] () const noexcept;
 
-        void //
-        detach() noexcept;
-
-        coro_ctx //
-        join [[nodiscard]] () noexcept;
-
-        bool //
+        inline constexpr bool //
         joinable [[nodiscard]] () const noexcept;
+
+        inline constexpr ctrl::join_fiber //
+        join [[nodiscard]] () noexcept;
     };
 }; // namespace fiber
+
+//
+//
+//
+//
+//
+// implementations
+//
+//
+//
+//
+//
+
+inline constexpr fiber::fiber& //
+fiber::fiber::operator=(fiber&& other)
+{
+    h_ = other.h_;
+    other.h_ = {};
+    return *this;
+}
+
+inline constexpr fiber::fiber::~fiber() noexcept
+{
+    if (h_)
+    {
+        h_.destroy();
+    }
+}
+
+inline fiber::fiber::id //
+fiber::fiber::get_id [[nodiscard]] () const noexcept
+{
+    return reinterpret_cast<id>(h_.address());
+}
+
+inline constexpr bool //
+fiber::fiber::joinable [[nodiscard]] () const noexcept
+{
+    return static_cast<bool>(h_);
+}
+
+inline constexpr fiber::ctrl::join_fiber //
+fiber::fiber::join [[nodiscard]] () noexcept
+{
+    return {h_};
+}
 
 #endif // FIBER_FIBER_HXX

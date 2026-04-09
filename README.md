@@ -8,7 +8,7 @@ The idea, in its essense, is to co-operatively switch between different corounti
 See main.cxx for an example
 
 ## Third-party
-Thanks to taskflow and his work steal queue https://github.com/taskflow/work-stealing-queue?tab=License-1-ov-file#readme
+Thanks to taskflow and his work steal queue https://github.com/taskflow/work-stealing-queue?tab=License-1-ov-file#readme and moodycamel's wonderful queue http://moodycamel.com/blog/2014/a-fast-general-purpose-lock-free-queue-for-c++
 
 ## Some issues
 On larget lambda captures, the performance can drop significantly. Apparently the idea of fiber + scheduler only works well on computational intense environment.
